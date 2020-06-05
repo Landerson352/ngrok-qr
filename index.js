@@ -5,16 +5,26 @@
 const ngrok = require("ngrok");
 const qrcode = require("qrcode-terminal");
 const chalk = require("chalk");
+const argv = require("yargs").argv;
+const _ = require("lodash");
 
 async function main() {
-  const { argv } = process;
-  const args = argv.slice(2);
+  const options = {};
+  // collect all shorthand props
+  _.each(argv._, (value) => {
+    // protocol (proto)
+    if (['http', 'tcp', 'tls'].indexOf(value) >= 0) options.proto = value;
+    // port (addr)
+    if (!isNaN(parseInt(value))) options.addr = value;
+  });
+  // map remainder of args to snake_case
+  _.each(argv, (value, key) => {
+    if (key !== '_' && key !== '$0') {
+      options[_.snakeCase(key)] = value;
+    }
+  });
 
-  const options = {
-    port: args && args.length ? args[0] : 3000
-  };
-
-  const url = await ngrok.connect(options.port);
+  const url = await ngrok.connect(options);
 
   const code = await new Promise(resolve =>
     qrcode.generate(url, { small: true }, qr => resolve(qr))
@@ -22,7 +32,7 @@ async function main() {
 
   const output = [
     `---------------------------`,
-    `> ngrok http ${options.port}`,
+    `> ngrok ${process.argv.slice(2).join(' ')}`,
     `---------------------------`,
     chalk.underline.cyan(url),
     `---------------------------`,
